@@ -19,12 +19,8 @@ function App() {
 
   // Log state for debugging
   useEffect(() => {
-    console.log('Current data:', data)
-
     const shapesExtracted = extractShapes(data)
     setShapes(shapesExtracted)
-
-    console.log('shapes:', shapes)
   }, [data, activeShape])
 
   const handlePredict = () => {
@@ -94,7 +90,6 @@ function App() {
   }
 
   const handleOnFieldMouseEnter = (shape: Shape) => {
-    console.log('shape: ', shape)
     drawShape(annotationViewerStageRef.current!, shape.id, {
       fill: '#64cff2',
     })
