@@ -10,6 +10,7 @@ type DocumentInterfaceProps = {
   shapes: Shape[]
   onClickUpload: (file: File) => void
   onClickPredict: () => void
+  onShapeMouseEnter: (shape: Shape) => void
 }
 
 export default function DocumentInterface({
@@ -17,6 +18,7 @@ export default function DocumentInterface({
   shapes,
   onClickUpload,
   onClickPredict,
+  onShapeMouseEnter,
 }: DocumentInterfaceProps) {
   return (
     <Stack sx={{ height: '100%' }}>
@@ -27,7 +29,12 @@ export default function DocumentInterface({
               {document ? (
                 <AnnotationViewer
                   data={{ image: URL.createObjectURL(document), shapes }}
-                  style={{ height: '100%', width: '100%', borderRadius: 4 }}
+                  style={{
+                    height: '100%',
+                    width: '100%',
+                    borderRadius: 4,
+                  }}
+                  onShapeMouseEnter={onShapeMouseEnter}
                 />
               ) : (
                 <Stack

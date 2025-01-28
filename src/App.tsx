@@ -9,16 +9,21 @@ import { Data, Shape } from './interface'
 function App() {
   const [document, setDocument] = useState<File | null>(null)
   const [shapes, setShapes] = useState<Shape[]>([])
+  const [activeShape, setActiveShape] = useState<{
+    id: string
+    type: string
+  }>({ id: '', type: '' })
 
   const { submitDocument, isLoading, data } = usePrediction()
 
   // Log state for debugging
   useEffect(() => {
     console.log('Current data:', data)
+    console.log('Active shape:', activeShape)
 
     const shapesExtracted = extractShapes(data)
     setShapes(shapesExtracted)
-  }, [data])
+  }, [data, activeShape])
 
   const handlePredict = () => {
     if (document) {
@@ -35,12 +40,12 @@ function App() {
   }
 
   const extractShapes = (data: Data) => {
-    const shapes = []
+    const shapes: Shape[] = []
 
     if (data?.document?.inference?.prediction) {
       const prediction = data.document.inference.prediction
 
-      // Loop through all properties in prediction
+      // Process the top-level properties in prediction
       for (const [key, value] of Object.entries(prediction)) {
         // Check if the property has a polygon array
         if (
@@ -55,10 +60,38 @@ function App() {
           })
         }
       }
+
+      // Process the line_items array
+      if (Array.isArray(prediction.line_items)) {
+        for (const item of prediction.line_items) {
+          if (
+            item &&
+            typeof item === 'object' &&
+            'polygon' in item &&
+            Array.isArray(item.polygon)
+          ) {
+            shapes.push({
+              id: item.description || 'unknown', // Use description as id or fallback to 'unknown'
+              coordinates: item.polygon,
+            })
+          }
+        }
+      }
     }
 
     return shapes
   }
+
+  const handleOnShapeMouseEnter = (shape: Shape) => {
+    console.log('On mouse leave', shape)
+
+    setActiveShape({
+      id: shape.id,
+      type: 'mouse-enter',
+    })
+  }
+
+  const isActive = (id: string) => id === activeShape.id
 
   return (
     <Grid container rowGap={2} sx={{ height: '100vh', background: '#FCFCFC' }}>
@@ -67,6 +100,7 @@ function App() {
           document={document}
           onClickUpload={(file: File) => setDocument(file)}
           onClickPredict={handlePredict}
+          onShapeMouseEnter={handleOnShapeMouseEnter}
           shapes={shapes}
         />
       </Grid>
@@ -104,6 +138,7 @@ function App() {
                     data={
                       data.document.inference.prediction.document_type.value
                     }
+                    isActive={isActive('document_type')}
                   />
 
                   <BoxComponent
@@ -111,6 +146,7 @@ function App() {
                     data={new Date(
                       data.document.inference.prediction.due_date.value,
                     ).toLocaleDateString()}
+                    isActive={isActive('due_date')}
                   />
 
                   <BoxComponent
@@ -118,17 +154,20 @@ function App() {
                     data={formatCurrency(
                       data.document.inference.prediction.total_amount.value,
                     )}
+                    isActive={isActive('total_amount')}
                   />
 
                   <BoxComponent
                     text="Locale"
                     data={data.document.inference.prediction.locale.value}
+                    isActive={isActive('locale')}
                   />
 
-                  <BoxComponent
+                  {/* <BoxComponent
                     text="Orientation"
                     data={`${data.document.inference.pages[0].orientation.value}°`}
-                  />
+                    isActive={isActive('document_type')}
+                  /> */}
                 </Stack>
               </Box>
 
@@ -148,7 +187,9 @@ function App() {
                           sx={{
                             p: 2,
                             borderRadius: 1,
-                            bgcolor: 'grey.50',
+                            bgcolor: isActive(item.description)
+                              ? 'primary.light'
+                              : 'grey.50',
                           }}
                         >
                           <Typography fontWeight={500} gutterBottom>
