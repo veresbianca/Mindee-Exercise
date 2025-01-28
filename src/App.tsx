@@ -1,27 +1,23 @@
 import { useEffect, useState } from 'react'
 import { Grid, Typography } from '@mui/material'
-import { useMutation } from '@tanstack/react-query'
-import axios from 'axios'
 
 import DocumentInterface from './DocumentInterface'
-
-const API_KEY = import.meta.env.VITE_MINDEE_API_KEY
-
-const mindee = axios.create({ baseURL: 'https://api.mindee.net/v1/products/' })
-
-const usePrediction = () => {
-  return useMutation({
-    mutationFn: async (document: File) => {
-      // call mindee API
-    },
-  })
-}
+import usePrediction from './hooks/usePrediction'
 
 function App() {
   const [document, setDocument] = useState<File | null>(null)
+  const { submitDocument, isLoading, data } = usePrediction()
 
-  const { mutate: predict, data: prediction } = usePrediction()
-  useEffect(() => console.log('prediction', prediction), [prediction])
+  // Log state for debugging
+  useEffect(() => {
+    console.log('Current data:', data)
+  }, [data])
+
+  const handlePredict = () => {
+    if (document) {
+      submitDocument.mutate(document)
+    }
+  }
 
   return (
     <Grid container rowGap={2} sx={{ height: '100vh', background: '#FCFCFC' }}>
@@ -29,7 +25,7 @@ function App() {
         <DocumentInterface
           document={document}
           onClickUpload={(file: File) => setDocument(file)}
-          onClickPredict={() => document && predict(document)}
+          onClickPredict={handlePredict}
         />
       </Grid>
 
