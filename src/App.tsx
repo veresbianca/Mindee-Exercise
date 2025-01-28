@@ -1,25 +1,23 @@
 import { useEffect, useState } from 'react'
-import {
-  Box,
-  Chip,
-  Divider,
-  Grid,
-  Paper,
-  Stack,
-  Typography,
-} from '@mui/material'
+import { Box, Divider, Grid, Paper, Stack, Typography } from '@mui/material'
 
 import { BoxComponent } from './components'
 import DocumentInterface from './DocumentInterface'
 import usePrediction from './hooks/usePrediction'
+import { Data, Shape } from './interface'
 
 function App() {
   const [document, setDocument] = useState<File | null>(null)
+  const [shapes, setShapes] = useState<Shape[]>([])
+
   const { submitDocument, isLoading, data } = usePrediction()
 
   // Log state for debugging
   useEffect(() => {
     console.log('Current data:', data)
+
+    const shapesExtracted = extractShapes(data)
+    setShapes(shapesExtracted)
   }, [data])
 
   const handlePredict = () => {
@@ -36,6 +34,32 @@ function App() {
     }).format(amount)
   }
 
+  const extractShapes = (data: Data) => {
+    const shapes = []
+
+    if (data?.document?.inference?.prediction) {
+      const prediction = data.document.inference.prediction
+
+      // Loop through all properties in prediction
+      for (const [key, value] of Object.entries(prediction)) {
+        // Check if the property has a polygon array
+        if (
+          value &&
+          typeof value === 'object' &&
+          'polygon' in value &&
+          Array.isArray(value.polygon)
+        ) {
+          shapes.push({
+            id: key, // Use the key as the id
+            coordinates: value.polygon,
+          })
+        }
+      }
+    }
+
+    return shapes
+  }
+
   return (
     <Grid container rowGap={2} sx={{ height: '100vh', background: '#FCFCFC' }}>
       <Grid item xs={6} sx={{ padding: 8 }}>
@@ -43,6 +67,7 @@ function App() {
           document={document}
           onClickUpload={(file: File) => setDocument(file)}
           onClickPredict={handlePredict}
+          shapes={shapes}
         />
       </Grid>
 
