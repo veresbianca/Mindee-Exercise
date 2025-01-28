@@ -1,7 +1,7 @@
-import { useEffect, useState } from 'react'
-import { Box, Divider, Grid, Paper, Stack, Typography } from '@mui/material'
+import { useEffect, useRef, useState } from 'react'
+import { Box, Grid, Paper, Typography } from '@mui/material'
+import { drawLayer, drawShape, setShapeConfig, Stage } from 'react-mindee-js'
 
-import { BoxComponent } from './components'
 import DocumentInterface from './DocumentInterface'
 import usePrediction from './hooks/usePrediction'
 import { Data, Shape } from './interface'
@@ -12,31 +12,25 @@ function App() {
   const [activeShape, setActiveShape] = useState<{
     id: string
     type: string
-  }>({ id: '', type: '' })
+    coordinates: [number, number][]
+  }>({ id: '', type: '', coordinates: [] })
 
   const { submitDocument, isLoading, data } = usePrediction()
 
   // Log state for debugging
   useEffect(() => {
     console.log('Current data:', data)
-    console.log('Active shape:', activeShape)
 
     const shapesExtracted = extractShapes(data)
     setShapes(shapesExtracted)
+
+    console.log('shapes:', shapes)
   }, [data, activeShape])
 
   const handlePredict = () => {
     if (document) {
       submitDocument.mutate(document)
     }
-  }
-
-  // Helper function to format currency
-  const formatCurrency = (amount: number) => {
-    return new Intl.NumberFormat('en-CA', {
-      style: 'currency',
-      currency: 'CAD',
-    }).format(amount)
   }
 
   const extractShapes = (data: Data) => {
@@ -71,7 +65,7 @@ function App() {
             Array.isArray(item.polygon)
           ) {
             shapes.push({
-              id: item.description || 'unknown', // Use description as id or fallback to 'unknown'
+              id: 'line_items',
               coordinates: item.polygon,
             })
           }
@@ -83,15 +77,37 @@ function App() {
   }
 
   const handleOnShapeMouseEnter = (shape: Shape) => {
-    console.log('On mouse leave', shape)
-
     setActiveShape({
       id: shape.id,
+      coordinates: shape.coordinates,
       type: 'mouse-enter',
     })
   }
 
-  const isActive = (id: string) => id === activeShape.id
+  const isActive = (id: string, coordinates: [number, number][]) =>
+    id === activeShape.id && coordinates === activeShape.coordinates
+
+  const annotationViewerStageRef = useRef<null | Stage>(null)
+
+  const handleSetAnnotationViewerStage = (stage: Stage) => {
+    annotationViewerStageRef.current = stage
+  }
+
+  const handleOnFieldMouseEnter = (shape: Shape) => {
+    console.log('shape: ', shape)
+    drawShape(annotationViewerStageRef.current!, shape.id, {
+      fill: '#64cff2',
+    })
+  }
+
+  const handleOnFieldMouseLeave = (shape: Shape) => {
+    setShapeConfig(annotationViewerStageRef.current!, shape.id, {
+      fill: 'transparent',
+    })
+    drawLayer(annotationViewerStageRef.current!)
+  }
+
+  const prediction = data?.document?.inference?.prediction ?? {}
 
   return (
     <Grid container rowGap={2} sx={{ height: '100vh', background: '#FCFCFC' }}>
@@ -102,149 +118,122 @@ function App() {
           onClickPredict={handlePredict}
           onShapeMouseEnter={handleOnShapeMouseEnter}
           shapes={shapes}
+          setAnnotationViewerStage={handleSetAnnotationViewerStage}
         />
       </Grid>
 
-      <Grid item xs={12} md={6} sx={{ p: 2, height: '100%' }}>
-        {isLoading ? (
-          <Paper
-            elevation={3}
-            sx={{
-              p: 3,
-              textAlign: 'center',
-              height: '100%',
-              minHeight: '400px',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-            }}
-          >
-            <Typography>Processing document...</Typography>
-          </Paper>
-        ) : data?.document?.inference ? (
-          <Paper
-            elevation={3}
-            sx={{ p: 3, height: '100%', minHeight: '400px', overflow: 'auto' }}
-          >
-            <Stack spacing={3}>
-              {/* Document Info */}
-              <Box>
-                <Typography variant="h6" gutterBottom>
-                  Document Information
-                </Typography>
-                <Stack spacing={2}>
-                  <BoxComponent
-                    text="Type"
-                    data={
-                      data.document.inference.prediction.document_type.value
-                    }
-                    isActive={isActive('document_type')}
-                  />
-
-                  <BoxComponent
-                    text="Due Date"
-                    data={new Date(
-                      data.document.inference.prediction.due_date.value,
-                    ).toLocaleDateString()}
-                    isActive={isActive('due_date')}
-                  />
-
-                  <BoxComponent
-                    text="Total Amount"
-                    data={formatCurrency(
-                      data.document.inference.prediction.total_amount.value,
-                    )}
-                    isActive={isActive('total_amount')}
-                  />
-
-                  <BoxComponent
-                    text="Locale"
-                    data={data.document.inference.prediction.locale.value}
-                    isActive={isActive('locale')}
-                  />
-
-                  {/* <BoxComponent
-                    text="Orientation"
-                    data={`${data.document.inference.pages[0].orientation.value}°`}
-                    isActive={isActive('document_type')}
-                  /> */}
-                </Stack>
+      {isLoading ? (
+        <Grid
+          item
+          xs={6}
+          sx={{ padding: 8, display: 'flex', alignItems: 'center' }}
+        >
+          <Typography>Processing document...</Typography>
+        </Grid>
+      ) : data?.document?.inference ? (
+        <Grid
+          item
+          xs={12}
+          md={6}
+          sx={{
+            p: 2,
+            height: '100%',
+            overflowY: 'auto', // Enables vertical scrolling
+          }}
+        >
+          {shapes
+            .filter((shape) => shape.id !== 'line_items')
+            .map((shape, key) => (
+              <Box
+                key={key}
+                data-id={shape.id}
+                onMouseEnter={() => handleOnFieldMouseEnter(shape)}
+                onMouseLeave={() => handleOnFieldMouseLeave(shape)}
+                sx={{
+                  p: 2,
+                  borderRadius: 4,
+                  border: isActive(shape.id, shape.coordinates)
+                    ? '1px solid #fc031c'
+                    : '1px solid grey.100',
+                  cursor: 'pointer',
+                  ':hover': {
+                    border: '2px solid #64cff2', // Blue border on hover
+                    bgcolor: '#64cff2', // Background color remains the same
+                  },
+                  '&:hover *': {
+                    color: '#fff', // Change text color on hover
+                  },
+                }}
+              >
+                {prediction[shape.id] ? (
+                  <>
+                    <Typography variant="h6" gutterBottom>
+                      ID: {shape.id}
+                    </Typography>
+                    <Typography sx={{ fontSize: '1rem' }} gutterBottom>
+                      Value: {prediction[shape.id].value}
+                    </Typography>
+                    <Typography sx={{ fontSize: '1rem' }} gutterBottom>
+                      Confidence: {prediction[shape.id].confidence}
+                    </Typography>
+                  </>
+                ) : null}
               </Box>
+            ))}
 
-              <Divider />
-
-              {/* Line Items */}
-              {data.document.inference.prediction.line_items?.length > 0 && (
-                <Box>
+          {prediction['line_items']
+            ? prediction['line_items'].map((item, key) => (
+                <Box
+                  key={key}
+                  onMouseEnter={() =>
+                    handleOnFieldMouseEnter({
+                      id: 'line_items',
+                      coordinates: item.polygon,
+                    })
+                  }
+                  onMouseLeave={() =>
+                    handleOnFieldMouseLeave({
+                      id: 'line_items',
+                      coordinates: item.polygon,
+                    })
+                  }
+                  sx={{
+                    p: 2,
+                    borderRadius: 4,
+                    border: isActive('line_items', item.polygon)
+                      ? '1px solid #fc031c'
+                      : '1px solid grey.100',
+                    cursor: 'pointer',
+                    ':hover': {
+                      border: '2px solid #64cff2', // Blue border on hover
+                      bgcolor: '#64cff2', // Background color remains the same
+                    },
+                    '&:hover *': {
+                      color: '#fff', // Change text color on hover
+                    },
+                  }}
+                >
                   <Typography variant="h6" gutterBottom>
-                    Line Items
+                    Description: {item.description}
                   </Typography>
-                  <Stack spacing={2}>
-                    {data.document.inference.prediction.line_items.map(
-                      (item, index) => (
-                        <Box
-                          key={index}
-                          sx={{
-                            p: 2,
-                            borderRadius: 1,
-                            bgcolor: isActive(item.description)
-                              ? 'primary.light'
-                              : 'grey.50',
-                          }}
-                        >
-                          <Typography fontWeight={500} gutterBottom>
-                            {item.description}
-                          </Typography>
-                          <Grid container spacing={2}>
-                            <Grid item xs={4}>
-                              <Typography color="text.secondary" fontSize={14}>
-                                Quantity
-                              </Typography>
-                              <Typography>{item.quantity}</Typography>
-                            </Grid>
-                            <Grid item xs={4}>
-                              <Typography color="text.secondary" fontSize={14}>
-                                Unit Price
-                              </Typography>
-                              <Typography>
-                                {formatCurrency(item.unit_price)}
-                              </Typography>
-                            </Grid>
-                            <Grid item xs={4}>
-                              <Typography color="text.secondary" fontSize={14}>
-                                Total
-                              </Typography>
-                              <Typography>
-                                {formatCurrency(item.total_amount)}
-                              </Typography>
-                            </Grid>
-                          </Grid>
-                        </Box>
-                      ),
-                    )}
-                  </Stack>
+                  <Typography sx={{ fontSize: '1rem' }} gutterBottom>
+                    Confidence: {item.confidence}
+                  </Typography>
                 </Box>
-              )}
-            </Stack>
-          </Paper>
-        ) : (
-          <Paper
-            elevation={3}
-            sx={{
-              p: 3,
-              height: '100%',
-              minHeight: '400px',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-            }}
-          >
-            <Typography color="textSecondary">
-              Upload and process a document to see the results
-            </Typography>
-          </Paper>
-        )}
-      </Grid>
+              ))
+            : null}
+        </Grid>
+      ) : (
+        <Grid
+          item
+          xs={6}
+          sx={{ padding: 8, display: 'flex', alignItems: 'center' }}
+        >
+          <Typography color="textSecondary">
+            Upload and process a document to see the results
+          </Typography>
+        </Grid>
+      )}
     </Grid>
   )
 }

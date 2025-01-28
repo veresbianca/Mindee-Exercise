@@ -12,13 +12,8 @@ const usePrediction = () => {
   const [currentJobId, setCurrentJobId] = useState<string | null>(null)
   const [isPolling, setIsPolling] = useState<boolean>(false)
 
-  // debugging logs for state
-  console.log('State:', { currentJobId, isPolling })
-
   const submitDocument = useMutation({
     mutationFn: async (document: File) => {
-      console.log('Submitting document...')
-
       const formData = new FormData()
       formData.append('document', document)
 
@@ -35,8 +30,6 @@ const usePrediction = () => {
       return response.data
     },
     onSuccess: (data) => {
-      console.log('Document submitted successfully, starting poll')
-
       setCurrentJobId(data.job.id)
       setIsPolling(true)
     },
@@ -46,8 +39,6 @@ const usePrediction = () => {
     queryKey: ['pollStatus', currentJobId],
     queryFn: async () => {
       if (!currentJobId || !isPolling) return null
-
-      console.log('Executing poll for job:', currentJobId)
 
       const response = await mindee.get<JobResponse>(
         `mindee/financial_document/v1/documents/queue/${currentJobId}`,
@@ -59,8 +50,6 @@ const usePrediction = () => {
       )
 
       if (response.data.document) {
-        console.log('Got final document data, stopping poll')
-
         setIsPolling(false)
       }
 
@@ -71,8 +60,6 @@ const usePrediction = () => {
       if (!currentJobId || !isPolling) return false
 
       if (data?.document) {
-        console.log('Have document data, stopping poll')
-
         return false
       }
       return 2000

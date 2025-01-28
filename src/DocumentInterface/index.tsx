@@ -1,6 +1,6 @@
 import { Button, Stack } from '@mui/material'
 import Dropzone from 'react-dropzone'
-import { AnnotationViewer } from 'react-mindee-js'
+import { AnnotationViewer, Stage } from 'react-mindee-js'
 
 import { Shape } from '../interface'
 import AnnotationPlaceholder from './AnnotationPlaceholder'
@@ -11,6 +11,7 @@ type DocumentInterfaceProps = {
   onClickUpload: (file: File) => void
   onClickPredict: () => void
   onShapeMouseEnter: (shape: Shape) => void
+  setAnnotationViewerStage: (stage: Stage) => void
 }
 
 export default function DocumentInterface({
@@ -19,6 +20,7 @@ export default function DocumentInterface({
   onClickUpload,
   onClickPredict,
   onShapeMouseEnter,
+  setAnnotationViewerStage,
 }: DocumentInterfaceProps) {
   return (
     <Stack sx={{ height: '100%' }}>
@@ -35,6 +37,7 @@ export default function DocumentInterface({
                     borderRadius: 4,
                   }}
                   onShapeMouseEnter={onShapeMouseEnter}
+                  getStage={setAnnotationViewerStage}
                 />
               ) : (
                 <Stack
